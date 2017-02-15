@@ -80,6 +80,7 @@ class ServerProfileManager: NSObject {
         openPanel.canChooseFiles = true
         openPanel.becomeKey()
         openPanel.begin { (result) -> Void in
+            // TODO not freeze the screen when running import process
             if (result == NSFileHandlingPanelOKButton && (openPanel.url) != nil) {
                 let fileManager = FileManager.default
                 let filePath:String = (openPanel.url?.path)!
@@ -97,6 +98,9 @@ class ServerProfileManager: NSObject {
                         profile.method = item["method"] as! String
                         profile.password = item["password"] as! String
                         profile.remark = item["remarks"] as! String
+                        if(item["group"] != nil){
+                            profile.ssrGroup = item["group"] as! String
+                        }
                         if (item["obfs"] != nil) {
                             profile.ssrObfs = item["obfs"] as! String
                             profile.ssrProtocol = item["protocol"] as! String
@@ -109,8 +113,8 @@ class ServerProfileManager: NSObject {
                         }
                         self.profiles.append(profile)
                         self.save()
-                        NotificationCenter.default.post(name: Notification.Name(rawValue: NOTIFY_SERVER_PROFILES_CHANGED), object: nil)
                     }
+                    NotificationCenter.default.post(name: Notification.Name(rawValue: NOTIFY_SERVER_PROFILES_CHANGED), object: nil)
                     let configsCount = (jsonArr1.object(forKey: "configs") as! [[String: AnyObject]]).count
                     let notification = NSUserNotification()
                     notification.title = "Import Server Profile succeed!".localized
@@ -133,7 +137,7 @@ class ServerProfileManager: NSObject {
         //读取example文件，删掉configs里面的配置，再用NSDictionary填充到configs里面
         let fileManager = FileManager.default
         
-        let filePath:String = Bundle.main.bundlePath + "/Contents/Resources/example-gui-config.json"
+        let filePath:String = Bundle.main.path(forResource: "example-gui-config", ofType: "json")!
         let data = fileManager.contents(atPath: filePath)
         let readString = NSString(data: data!, encoding: String.Encoding.utf8.rawValue)!
         let readStringData = readString.data(using: String.Encoding.utf8.rawValue)
@@ -159,8 +163,11 @@ class ServerProfileManager: NSObject {
                     configProfile.setValue(profile.ssrObfsParam, forKey: "obfsparam")
                 }
                 if profile.ssrProtocolParam != "" {
-                    configProfile.setValue(profile.ssrProtocolParam, forKey: "protoclparam")
+                    configProfile.setValue(profile.ssrProtocolParam, forKey: "protocolparam")
                 }
+            }
+            if profile.ssrGroup != "" {
+                configProfile.setValue(profile.ssrGroup, forKey: "group")
             }
             configsArray.add(configProfile)
         }
@@ -189,7 +196,7 @@ class ServerProfileManager: NSObject {
     
     class func showExampleConfigFile() {
         //copy file to ~/Downloads folder
-        let filePath:String = Bundle.main.bundlePath + "/Contents/Resources/example-gui-config.json"
+        let filePath:String = Bundle.main.path(forResource: "example-gui-config", ofType: "json")!
         let fileMgr = FileManager.default
         let dataPath = NSHomeDirectory() + "/Downloads"
         let destPath = dataPath + "/example-gui-config.json"

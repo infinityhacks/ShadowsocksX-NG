@@ -27,8 +27,7 @@ class PreferencesWindowController: NSWindowController
     @IBOutlet weak var duplicateProfileButton: NSButton!
     @IBOutlet weak var passwordTextField: NSTextField!
     @IBOutlet weak var remarkTextField: NSTextField!
-    
-    @IBOutlet weak var otaCheckBoxBtn: NSButton!
+    @IBOutlet weak var groupTextField: NSTextField!
     
     @IBOutlet weak var copyURLBtn: NSButton!
     
@@ -56,6 +55,9 @@ class PreferencesWindowController: NSWindowController
             "aes-128-cfb",
             "aes-192-cfb",
             "aes-256-cfb",
+            "aes-128-ctr",
+            "aes-192-ctr",
+            "aes-256-ctr",
             "bf-cfb",
             "camellia-128-cfb",
             "camellia-192-cfb",
@@ -71,17 +73,18 @@ class PreferencesWindowController: NSWindowController
             ])
         ProtocolTextField.addItems(withObjectValues: [
             "origin",
-            "verify_simple",
-            "verify_sha1",
+            "verify_deflate",
             "auth_sha1",
             "auth_sha1_v2",
             "auth_sha1_v4",
+            "auth_aes128_sha1",
+            "auth_aes128_md5",
             ])
         ObfsTextField.addItems(withObjectValues: [
             "plain",
             "http_simple",
             "tls_simple",
-            "random_head",
+            "http_post",
             "tls1.2_ticket_auth",
             ])
         profilesTableView.reloadData()
@@ -189,7 +192,7 @@ class PreferencesWindowController: NSWindowController
     }
     
     func updateProfileBoxVisible() {
-        if profileMgr.profiles.count <= 1 {
+        if profileMgr.profiles.count <= 0 {
             removeButton.isEnabled = false
         }else{
             removeButton.isEnabled = true
@@ -227,9 +230,8 @@ class PreferencesWindowController: NSWindowController
             ObfsTextField.bind("value", to: editingProfile, withKeyPath: "ssrObfs", options: [NSContinuouslyUpdatesValueBindingOption: true])
             
             ObfsParamTextField.bind("value", to: editingProfile, withKeyPath: "ssrObfsParam", options: [NSContinuouslyUpdatesValueBindingOption: true])
+            groupTextField.bind("value", to: editingProfile, withKeyPath: "ssrGroup", options: [NSContinuouslyUpdatesValueBindingOption: true])
             
-            otaCheckBoxBtn.bind("value", to: editingProfile, withKeyPath: "ota"
-                , options: [NSContinuouslyUpdatesValueBindingOption: true])
         } else {
             editingProfile = nil
             hostTextField.unbind("value")
@@ -245,7 +247,6 @@ class PreferencesWindowController: NSWindowController
             
             remarkTextField.unbind("value")
             
-            otaCheckBoxBtn.unbind("value")
         }
     }
     

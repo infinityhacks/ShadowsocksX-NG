@@ -11,7 +11,7 @@ import Foundation
 class PingTest: NSObject, SimplePingDelegate {
     static let instance = PingTest(hostName: "")
     //then 写一个init函数，传入hostName来init
-    var hostName = "jp10.hexiehao.pw"
+    var hostName = "baidu.com"
     
     var pinger: SimplePing?
     var sendTimer: Timer?

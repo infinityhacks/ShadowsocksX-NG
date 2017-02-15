@@ -18,12 +18,12 @@ class ServerProfile: NSObject {
     var method:String = "aes-128-cfb"
     var password:String = ""
     var remark:String = ""
-    var ota: Bool = false // onetime authentication
     
     var ssrProtocol:String = "origin"
     var ssrProtocolParam:String = ""
     var ssrObfs:String = "plain"
     var ssrObfsParam:String = ""
+    var ssrGroup: String = ""
     
     var latency:String?
     
@@ -46,9 +46,6 @@ class ServerProfile: NSObject {
             if let remark = data["Remark"] {
                 profile.remark = remark as! String
             }
-            if let ota = data["OTA"] {
-                profile.ota = ota as! Bool
-            }
             if let ssrObfs = data["ssrObfs"] {
                 profile.ssrObfs = ssrObfs as! String
             }
@@ -60,6 +57,9 @@ class ServerProfile: NSObject {
             }
             if let ssrProtocolParam = data["ssrProtocolParam"]{
                 profile.ssrProtocolParam = ssrProtocolParam as! String
+            }
+            if let ssrGroup = data["ssrGroup"]{
+                profile.ssrGroup = ssrGroup as! String
             }
         }
         
@@ -82,15 +82,16 @@ class ServerProfile: NSObject {
         d["Method"] = method as AnyObject?
         d["Password"] = password as AnyObject?
         d["Remark"] = remark as AnyObject?
-        d["OTA"] = ota as AnyObject?
         d["ssrProtocol"] = ssrProtocol as AnyObject?
         d["ssrProtocolParam"] = ssrProtocolParam as AnyObject?
         d["ssrObfs"] = ssrObfs as AnyObject?
         d["ssrObfsParam"] = ssrObfsParam as AnyObject?
+        d["ssrGroup"] = ssrGroup as AnyObject?
         return d
     }
     
     func toJsonConfig() -> [String: AnyObject] {
+        // supply json file for ss-local only export vital param
         var conf: [String: AnyObject] = ["server": serverHost as AnyObject,
                                          "server_port": NSNumber(value: serverPort as UInt16),
                                          "password": password as AnyObject,
@@ -100,11 +101,10 @@ class ServerProfile: NSObject {
         conf["local_port"] = NSNumber(value: UInt16(defaults.integer(forKey: "LocalSocks5.ListenPort")) as UInt16)
         conf["local_address"] = defaults.string(forKey: "LocalSocks5.ListenAddress") as AnyObject?
         conf["timeout"] = NSNumber(value: UInt32(defaults.integer(forKey: "LocalSocks5.Timeout")) as UInt32)
-        conf["auth"] = NSNumber(value: ota as Bool)
         
         if(!ssrObfs.isEmpty){
             conf["protocol"] = ssrProtocol as AnyObject?
-            conf["protocol_param"] = ssrProtocolParam as AnyObject?
+            conf["protocol_param"] = ssrProtocolParam as AnyObject?// do not muta here
             conf["obfs"] = ssrObfs as AnyObject?
             conf["obfs_param"] = ssrObfsParam as AnyObject?
         }
@@ -167,17 +167,22 @@ class ServerProfile: NSObject {
         }else{
             let firstParts = "\(serverHost):\(serverPort):\(ssrProtocol):\(method):\(ssrObfs):"
             let secondParts = "\(password)"
-            //base64(abc.xyz:12345:auth_sha1_v2:rc4-md5:tls1.2_ticket_auth:{base64(password)}/?obfsparam={base64(混淆参数(网址))}&remarks={base64(节点名称)})
+            // ssr:// + base64(abc.xyz:12345:auth_sha1_v2:rc4-md5:tls1.2_ticket_auth:{base64(password)}/?obfsparam={base64(混淆参数(网址))}&protoparam={base64(混淆协议)}&remarks={base64(节点名称)}&group={base64(分组名)})
             let base64PasswordString = secondParts.data(using: String.Encoding.utf8)?
                 .base64EncodedString(options: NSData.Base64EncodingOptions())
             
             let base64ssrObfsParamString = ssrObfsParam.data(using: String.Encoding.utf8)?
                 .base64EncodedString(options: NSData.Base64EncodingOptions())
+            
+            let base64ssrProtocolParamString = ssrProtocolParam.data(using: String.Encoding.utf8)?
+                .base64EncodedString(options: NSData.Base64EncodingOptions())
           
             let base64RemarkString = remark.data(using: String.Encoding.utf8)?
                 .base64EncodedString(options: NSData.Base64EncodingOptions())
             
-            var s = firstParts + base64PasswordString! + "/?" + "obfsparam=" + base64ssrObfsParamString! + "&remarks=" + base64RemarkString!
+            let base64GroupString = ssrGroup.data(using: String.Encoding.utf8)?.base64EncodedString(options:  NSData.Base64EncodingOptions())
+            
+            var s = firstParts + base64PasswordString! + "/?" + "obfsparam=" + base64ssrObfsParamString! + "&protoparam=" + base64ssrProtocolParamString! + "&remarks=" + base64RemarkString! + "&group=" + base64GroupString!
             s = (s.data(using: String.Encoding.utf8)?
                 .base64EncodedString(options: NSData.Base64EncodingOptions()))!
             return Foundation.URL(string: "ssr://\(s)")

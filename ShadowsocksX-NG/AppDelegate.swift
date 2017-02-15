@@ -48,6 +48,8 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSUserNotificationCenterDele
     @IBOutlet weak var lanchAtLoginMenuItem: NSMenuItem!
     @IBOutlet weak var connectAtLaunchMenuItem: NSMenuItem!
     @IBOutlet weak var ShowNetworkSpeedItem: NSMenuItem!
+    @IBOutlet weak var checkUpdateMenuItem: NSMenuItem!
+    @IBOutlet weak var checkUpdateAtLaunchMenuItem: NSMenuItem!
     
     // MARK: Variables
     var statusItemView:StatusItemView!
@@ -58,23 +60,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSUserNotificationCenterDele
 
     func applicationDidFinishLaunching(_ aNotification: Notification) {
         // Insert code here to initialize your application
-//        PingServers.instance.ping()
-//        let newInstance = PingTest.init(hostName: "www.baidu.com")
-//        newInstance.start()
         
-//        let SerMgr = ServerProfileManager.instance
-//        let pingServerQueue : DispatchQueue = DispatchQueue.global(priority: DispatchQueue.GlobalQueuePriority.high)
-//        
-//        for profile in SerMgr.profiles {
-//            let host = profile.serverHost
-//            
-//            pingServerQueue.async(execute: {
-//                print(profile.serverHost)
-//                SimplePingClient().pingHostname(host) { latency in
-//                    print("-----------\(host) latency is \(latency ?? "fail")")}
-////                let pingInstance = PingTest.init(hostName: host)
-////                pingInstance.start()
-//            })}
         NSUserNotificationCenter.default.delegate = self
         
         // Prepare ss-local
@@ -99,7 +85,8 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSUserNotificationCenterDele
             "LocalHTTP.ListenAddress": "127.0.0.1",
             "LocalHTTP.ListenPort": NSNumber(value: 1087 as UInt16),
             "LocalHTTPOn": true,
-            "LocalHTTP.FollowGlobel": true
+            "LocalHTTP.FollowGlobal": true,
+            "AutoCheckUpdate": false
         ])
 
         setUpMenu(defaults.bool(forKey: "enable_showSpeed"))
@@ -129,6 +116,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSUserNotificationCenterDele
                 }
                 self.updateServersMenu()
                 self.updateMainMenu()
+                self.updateRunningModeMenu()
                 SyncSSLocal()
             }
         )
@@ -176,7 +164,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSUserNotificationCenterDele
                     }else{
                         let userNote = NSUserNotification()
                         userNote.title = "Failed to Add Server Profile".localized
-                        userNote.subtitle = "Address can't not be recognized".localized
+                        userNote.subtitle = "Address can not be recognized".localized
                         NSUserNotificationCenter.default
                             .deliver(userNote);
                     }
@@ -205,6 +193,10 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSUserNotificationCenterDele
 
         if defaults.bool(forKey: "ConnectAtLaunch") {
             toggleRunning(toggleRunningMenuItem)
+        }
+        // Version Check!
+        if defaults.bool(forKey: "AutoCheckUpdate"){
+            checkForUpdate(mustShowAlert: false)
         }
     }
 
@@ -465,7 +457,17 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSUserNotificationCenterDele
     }
     
     @IBAction func feedback(_ sender: NSMenuItem) {
-        NSWorkspace.shared().open(URL(string: "https://github.com/qinyuhang/ShadowsocksX-NG/issues")!)
+        NSWorkspace.shared().open(URL(string: "https://github.com/shadowsocksr/ShadowsocksX-NG/issues")!)
+    }
+    
+    @IBAction func checkForUpdate(_ sender: NSMenuItem) {
+        checkForUpdate(mustShowAlert: true)
+    }
+    
+    @IBAction func checkUpdatesAtLaunch(_ sender: NSMenuItem) {
+        let defaults = UserDefaults.standard
+        defaults.set(!defaults.bool(forKey: "AutoCheckUpdate"), forKey: "AutoCheckUpdate")
+        checkUpdateAtLaunchMenuItem.state = defaults.bool(forKey: "AutoCheckUpdate") ? 1 : 0
     }
     
     @IBAction func showAbout(_ sender: NSMenuItem) {
@@ -474,11 +476,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSUserNotificationCenterDele
     }
     
     func updateLaunchAtLoginMenu() {
-        if launchAtLoginController.launchAtLogin {
-            lanchAtLoginMenuItem.state = 1
-        } else {
-            lanchAtLoginMenuItem.state = 0
-        }
+        lanchAtLoginMenuItem.state = launchAtLoginController.launchAtLogin ? 1 : 0
     }
     
     // MARK: this function is use to update menu bar
@@ -486,7 +484,6 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSUserNotificationCenterDele
     func updateRunningModeMenu() {
         let defaults = UserDefaults.standard
         let mode = defaults.string(forKey: "ShadowsocksRunningMode")
-//<<<<<<< HEAD
         var serverMenuText = "Servers".localized
         
         let mgr = ServerProfileManager.instance
@@ -500,20 +497,6 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSUserNotificationCenterDele
                 if let latency = p.latency{
                     serverMenuText += "  - \(latency)ms"
                 }
-//=======
-//
-//        var serverMenuText = "Servers".localized
-//        for v in defaults.array(forKey: "ServerProfiles")! {
-//            let profile = v as! [String:Any]
-//            if profile["Id"] as! String == defaults.string(forKey: "ActiveServerProfileId")! {
-//                var profileName :String
-//                if profile["Remark"] as! String != "" {
-//                    profileName = profile["Remark"] as! String
-//                } else {
-//                    profileName = profile["ServerHost"] as! String
-//>>>>>>> shadowsocks/develop
-//                }
-//                serverMenuText = "\(serverMenuText) - \(profileName)"
             }
         }
 
@@ -604,17 +587,9 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSUserNotificationCenterDele
 //            statusItemView.setIcon(image!)
         }
         
-        if defaults.bool(forKey: "enable_showSpeed") {
-            ShowNetworkSpeedItem.state = 1
-        }else{
-            ShowNetworkSpeedItem.state = 0
-        }
-        
-        if defaults.bool(forKey: "ConnectAtLaunch") {
-            connectAtLaunchMenuItem.state = 1
-        } else {
-            connectAtLaunchMenuItem.state = 0
-        }
+        ShowNetworkSpeedItem.state          = defaults.bool(forKey: "enable_showSpeed") ? 1 : 0
+        connectAtLaunchMenuItem.state       = defaults.bool(forKey: "ConnectAtLaunch")  ? 1 : 0
+        checkUpdateAtLaunchMenuItem.state   = defaults.bool(forKey: "AutoCheckUpdate")  ? 1 : 0
     }
     
     func updateServersMenu() {
@@ -648,7 +623,34 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSUserNotificationCenterDele
             if !p.isValid() {
                 item.isEnabled = false
             }
+            
             item.action = #selector(AppDelegate.selectServer)
+            
+            if !p.ssrGroup.isEmpty {
+                if((serversMenuItem.submenu?.item(withTitle: p.ssrGroup)) == nil){
+                    let groupSubmenu = NSMenu()
+                    let groupSubmenuItem = NSMenuItem()
+                    groupSubmenuItem.title = p.ssrGroup
+                    serversMenuItem.submenu?.addItem(groupSubmenuItem)
+                    serversMenuItem.submenu?.setSubmenu(groupSubmenu, for: groupSubmenuItem)
+                    if mgr.activeProfileId == p.uuid {
+                        item.state = 1
+                        groupSubmenuItem.state = 1
+                    }
+                    groupSubmenuItem.submenu?.addItem(item)
+                    i += 1
+                    continue
+                }
+                else{
+                    if mgr.activeProfileId == p.uuid {
+                        item.state = 1
+                        serversMenuItem.submenu?.item(withTitle: p.ssrGroup)?.state = 1
+                    }
+                    serversMenuItem.submenu?.item(withTitle: p.ssrGroup)?.submenu?.addItem(item)
+                    i += 1
+                    continue
+                }
+            }
             
             serversMenuItem.submenu?.addItem(item)
             i += 1
@@ -689,6 +691,22 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSUserNotificationCenterDele
 //            speedMonitor = nil
 //            statusItem?.length = 20
 //        }
+    }
+    
+    func checkForUpdate(mustShowAlert: Bool) -> Void {
+        let versionChecker = VersionChecker()
+        DispatchQueue.global().async {
+            let newVersion = versionChecker.checkNewVersion()
+            DispatchQueue.main.async {
+                if (mustShowAlert || newVersion["newVersion"] as! Bool){
+                    let alertResult = versionChecker.showAlertView(Title: newVersion["Title"] as! String, SubTitle: newVersion["SubTitle"] as! String, ConfirmBtn: newVersion["ConfirmBtn"] as! String, CancelBtn: newVersion["CancelBtn"] as! String)
+                    print(alertResult)
+                    if (newVersion["newVersion"] as! Bool && alertResult == 1000){
+                        NSWorkspace.shared().open(URL(string: "https://github.com/shadowsocksr/ShadowsocksX-NG/releases")!)
+                    }
+                }
+            }
+        }
     }
     
     // MARK: 

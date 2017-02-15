@@ -61,6 +61,7 @@ void ScanQRCodeOnScreen() {
                 [foundSSUrls addObject:[NSURL URLWithString:feature.messageString]];
             }
         }
+         CGImageRelease(image);
     }
     
     free(displays);
@@ -72,6 +73,19 @@ void ScanQRCodeOnScreen() {
                   @"source": @"qrcode"
                  }
      ];
+}
+
+NSString* decode64(NSString* str){
+    
+    str = [str stringByReplacingOccurrencesOfString:@"-" withString:@"+"];
+    str = [str stringByReplacingOccurrencesOfString:@"_" withString:@"/"];
+    if(str.length%4){
+        NSInteger length = (4-str.length%4) + str.length;
+        str = [str stringByPaddingToLength: length withString:@"=" startingAtIndex:0];
+    }
+    NSData* decodeData = [[NSData alloc] initWithBase64EncodedString:str options:0];
+    NSString* decodeStr = [[NSString alloc] initWithData:decodeData encoding:NSUTF8StringEncoding];
+    return decodeStr;
 }
 
 // 解析SS URL，如果成功则返回一个与ServerProfile类兼容的dict
@@ -136,13 +150,14 @@ NSDictionary<NSString *, id>* ParseSSURL(NSURL* url) {
         }
 
     }else if ([urlString hasPrefix:@"ssr://"]){
-        // ssr:// + base64(abc.xyz:12345:auth_sha1_v2:rc4-md5:tls1.2_ticket_auth:{base64(password)}/?obfsparam={base64(混淆参数(网址))}&remarks={base64(节点名称)})
+        // ssr:// + base64(abc.xyz:12345:auth_sha1_v2:rc4-md5:tls1.2_ticket_auth:{base64(password)}/?obfsparam={base64(混淆参数(网址))}&protoparam={base64(混淆协议)}&remarks={base64(节点名称)}&group={base64(分组名)})
+
+
         urlString = [urlString stringByReplacingOccurrencesOfString:@"ssr://" withString:@"" options:NSAnchoredSearch range:NSMakeRange(0, urlString.length)];
-        NSData *data = [[NSData alloc] initWithBase64EncodedString:urlString options:0];
-        NSString *decodedString = [[NSString alloc] initWithData:data encoding:NSUTF8StringEncoding];
+//        NSData *data = [[NSData alloc] initWithBase64EncodedString:urlString options:0];
+        NSString *decodedString = decode64(urlString);//[[NSString alloc] initWithData:data encoding:NSUTF8StringEncoding];
         urlString = decodedString;
-        
-        if (data == NULL) {
+        if ([decodedString isEqual: @""]) {
             [[NSNotificationCenter defaultCenter]
              postNotificationName:@"NOTIFY_INVALIDE_QR"
              object:nil
@@ -163,12 +178,13 @@ NSDictionary<NSString *, id>* ParseSSURL(NSURL* url) {
                 NSRange lastParamSplit = [toSplitString rangeOfString:@"="];
                 if (lastParamSplit.location != NSNotFound) {
                     NSString *key = [toSplitString substringToIndex:lastParamSplit.location];
-                    NSString *value =  [[NSString alloc] initWithData:[[NSData alloc] initWithBase64EncodedString:[toSplitString substringFromIndex:lastParamSplit.location+1] options:0]encoding:NSUTF8StringEncoding];
+                    NSString *value = decode64([toSplitString substringFromIndex:lastParamSplit.location+1]);
+                    // [[NSString alloc] initWithData:[[NSData alloc] initWithBase64EncodedString:[[[toSplitString stringByReplacingOccurrencesOfString:@"-" withString:@"+"] stringByReplacingOccurrencesOfString:@"_" withString:@"/"]substringFromIndex:lastParamSplit.location+1] options:0]encoding:NSUTF8StringEncoding];
                     //                            NSString *value =  [toSplitString substringFromIndex:lastParamSplit.location+1];
                     [parserLastParamDict setValue: value forKey: key];
                 }
             }
-            NSLog(@"parserLastParamDict is %@",parserLastParamDict);
+//            NSLog(@"parserLastParamDict is %@",parserLastParamDict);
             
             //后面已经parser完成，接下来需要解析到profile里面
             //abc.xyz:12345:auth_sha1_v2:rc4-md5:tls1.2_ticket_auth:{base64(password)}
@@ -193,19 +209,22 @@ NSDictionary<NSString *, id>* ParseSSURL(NSURL* url) {
             
             firstParam = [firstParam substringFromIndex:range.location + range.length];
             //                    range = [firstParam rangeOfString:@":"];
-            NSString *password = [[NSString alloc] initWithData:[[NSData alloc] initWithBase64EncodedString:firstParam options:0]encoding:NSUTF8StringEncoding];//第五个参数是base64密码
+            NSString *password = decode64(firstParam);// [[NSString alloc] initWithData:[[NSData alloc] initWithBase64EncodedString:firstParam options:0]encoding:NSUTF8StringEncoding];//第五个参数是base64密码
             
             NSString *ssrObfsParam = @"";
             NSString *remarks = @"";
             NSString *ssrProtocolParam = @"";
+            NSString *ssrGroup = @"";
             for (NSString *key in parserLastParamDict) {
-                NSLog(@"key: %@ value: %@", key, parserLastParamDict[key]);
+//                NSLog(@"key: %@ value: %@", key, parserLastParamDict[key]);
                 if ([key  isEqual: @"obfsparam"]) {
                     ssrObfsParam = parserLastParamDict[key];
                 } else if ([key  isEqual: @"remarks"]) {
                     remarks = parserLastParamDict[key];
-                } else if([key isEqual:@"protocolparam"]){
+                } else if([key isEqual:@"protoparam"]){
                     ssrProtocolParam = parserLastParamDict[key];
+                } else if([key isEqual:@"group"]){
+                    ssrGroup = parserLastParamDict[key];
                 }
             }
         
@@ -217,6 +236,8 @@ NSDictionary<NSString *, id>* ParseSSURL(NSURL* url) {
                  @"ssrObfsParam":ssrObfsParam,
                  @"ssrProtocol":ssrProtocol,
                  @"ssrProtocolParam":ssrProtocolParam,
+                 @"Remark":remarks,
+                 @"ssrGroup":ssrGroup,
                  };
         }
     }
